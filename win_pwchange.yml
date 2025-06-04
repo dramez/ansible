@@ -1,0 +1,30 @@
+---
+- name: Change user passwords on Windows
+  hosts: windows
+  vars_files:
+    - group_vars/windows/vault.yml
+  tasks:
+    - name: Change virtual user password
+      ansible.windows.win_user:
+        name: virtual
+        password: "{{ windows_virtual_password }}"
+        state: present
+
+    - name: Change Administrator user password
+      ansible.windows.win_user:
+        name: Administrator
+        password: "{{ windows_admin_password }}"
+        state: present
+
+    - name: Change sshsvusr user password
+      ansible.windows.win_user:
+        name: sshsvusr
+        password: "{{ windows_sshsvusr_password }}"
+        state: present
+
+#ansible-vault create group_vars/windows/vault.yml
+
+## group_vars/windows/vault.yml
+#windows_virtual_password: 'P@ssw0rd!'
+#windows_admin_password: 'P@ssw0rd!'
+#windows_sshsvusr_password: 'P@ssw0rd!'
