@@ -3,7 +3,7 @@
   hosts: "{{ target_hosts | default('all') }}"
   vars_prompt:
     - name: copy_type
-      prompt: "Copy type - (1) Local to Remote, (2) Remote to Remote, (3) Local to Local"
+      prompt: "Copy type - (1) Local to Remote, (2) Remote to Remote, (3) Local to Local, (4) Remote to Local"
       private: no
       default: "1"
     
@@ -67,7 +67,15 @@
         force: yes
       when: copy_type == "3"
 
-    - name: Create destination directories if needed
+    - name: Copy files - Remote to Local (Type 4)
+      fetch:
+        src: "{{ source_path }}"
+        dest: "{{ dest_path }}"
+        flat: yes
+        backup: "{{ backup_files | bool }}"
+      when: copy_type == "4"
+
+    - name: Create destination directories if needed (for local operations)
       file:
         path: "{{ dest_path | dirname }}"
         state: directory
@@ -75,14 +83,37 @@
       when: 
         - create_dirs | bool
         - dest_path is match('.*/')
+        - copy_type in ["1", "2", "3"]
       ignore_errors: yes
 
-    - name: Verify copy operation
+    - name: Create local destination directories if needed (for Remote to Local)
+      local_action:
+        module: file
+        path: "{{ dest_path | dirname }}"
+        state: directory
+        mode: '0755'
+      when: 
+        - create_dirs | bool
+        - dest_path is match('.*/')
+        - copy_type == "4"
+      ignore_errors: yes
+      run_once: true
+
+    - name: Verify copy operation (remote files)
       stat:
         path: "{{ dest_path }}"
       register: copy_result
+      when: copy_type in ["1", "2", "3"]
 
-    - name: Display copy result
+    - name: Verify copy operation (local files)
+      local_action:
+        module: stat
+        path: "{{ dest_path }}"
+      register: local_copy_result
+      when: copy_type == "4"
+      run_once: true
+
+    - name: Display copy result (remote)
       debug:
         msg: |
           Copy operation completed!
@@ -91,3 +122,16 @@
           File size: {{ copy_result.stat.size }} bytes
           Last modified: {{ copy_result.stat.mtime }}
           {% endif %}
+      when: copy_type in ["1", "2", "3"]
+
+    - name: Display copy result (local)
+      debug:
+        msg: |
+          Copy operation completed!
+          File exists at local destination: {{ local_copy_result.stat.exists }}
+          {% if local_copy_result.stat.exists %}
+          File size: {{ local_copy_result.stat.size }} bytes
+          Last modified: {{ local_copy_result.stat.mtime }}
+          {% endif %}
+      when: copy_type == "4"
+      run_once: true
