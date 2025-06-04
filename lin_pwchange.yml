@@ -1,32 +1,23 @@
 ---
-- name: Change "virtual" user password
+- name: Change user passwords on Linux
   hosts: linux
   vars_files:
-    - vault.yml
+    - group_vars/linux/vault.yml
+
   tasks:
-    - name: changing
+    - name: Change virtual user password
       ansible.builtin.user:
         name: virtual
         state: present
         password: "{{ linux_virtual_password }}"
 
-- name: Change "sshsvusr" user password
-  hosts: linux
-  vars_files:
-    - vault.yml
-  tasks:
-    - name: changing
+    - name: Change sshsvusr user password
       ansible.builtin.user:
         name: sshsvusr
         state: present
         password: "{{ linux_sshsvusr_password }}"
 
-- name: Change "root" user password
-  hosts: linux
-  vars_files:
-    - vault.yml
-  tasks:
-    - name: changing
+    - name: Change root user password
       ansible.builtin.user:
         name: root
         state: present

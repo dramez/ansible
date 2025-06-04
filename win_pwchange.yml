@@ -3,24 +3,25 @@
   hosts: windows
   vars_files:
     - group_vars/windows/vault.yml
+
   tasks:
     - name: Change virtual user password
       ansible.windows.win_user:
         name: virtual
+        state: present
         password: "{{ windows_virtual_password }}"
-        state: present
-
-    - name: Change Administrator user password
-      ansible.windows.win_user:
-        name: Administrator
-        password: "{{ windows_admin_password }}"
-        state: present
 
     - name: Change sshsvusr user password
       ansible.windows.win_user:
         name: sshsvusr
-        password: "{{ windows_sshsvusr_password }}"
         state: present
+        password: "{{ windows_sshsvusr_password }}"
+
+    - name: Change Administrator user password
+      ansible.windows.win_user:
+        name: Administrator
+        state: present
+        password: "{{ windows_admin_password }}"
 
 #ansible-vault create group_vars/windows/vault.yml
 
