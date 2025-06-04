@@ -1,0 +1,46 @@
+---
+- name: Check LVM2 VGS Free Space
+  hosts: linux
+  become: yes  # Run as sudo
+  gather_facts: yes  # Ensure we gather facts about the hosts
+
+  tasks:
+    - name: Get LVM2 VGS information
+      ansible.builtin.shell: vgs --noheadings --units g --nosuffix --separator ',' --options vg_name,vg_size,vg_free
+      register: vgs_output
+      changed_when: false  # This task never changes the system
+
+    - name: Parse VGS output
+      ansible.builtin.set_fact:
+        vgs_info: "{{ vgs_output.stdout_lines | map('split', ',') | list }}"
+
+    - name: Display VGS information for groups with free space
+      ansible.builtin.debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          VG Name: {{ item[0] | trim }}
+          VG Size: {{ item[1] | float | round(2) }}G
+          VG Free: {{ item[2] | float | round(2) }}G
+          Utilization: {{ ((1 - (item[2] | float / item[1] | float)) * 100) | round(2) }}%
+      loop: "{{ vgs_info }}"
+      when: (item[2] | float > 0) and ((item[2] | float / item[1] | float) < 1)
+
+    - name: Collect VGS information for all hosts
+      ansible.builtin.set_fact:
+        all_vgs_info: "{{ all_vgs_info | default([]) + [{'host': inventory_hostname, 'vgs': vgs_info}] }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Display summary of all hosts with VGs having free space
+      ansible.builtin.debug:
+        msg: |
+          {% for host_info in all_vgs_info %}
+          Host: {{ host_info.host }}
+          {% for vg in host_info.vgs %}
+          {% if (vg[2] | float > 0) and ((vg[2] | float / vg[1] | float) < 1) %}
+          - VG: {{ vg[0] | trim }}, Size: {{ vg[1] | float | round(2) }}G, Free: {{ vg[2] | float | round(2) }}G, Utilization: {{ ((1 - (vg[2] | float / vg[1] | float)) * 100) | round(2) }}%
+          {% endif %}
+          {% endfor %}
+          {% endfor %}
+      run_once: true
+      delegate_to: localhost

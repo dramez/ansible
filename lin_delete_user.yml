@@ -1,0 +1,73 @@
+---
+- name: Check and Delete User
+  hosts: linux
+  become: yes  # Run as sudo
+  gather_facts: yes  # Ensure we gather facts about the hosts
+
+  vars_prompt:
+    - name: "username_to_delete"
+      prompt: "Enter the username to delete"
+      private: no  # Show the input as it's typed
+
+  tasks:
+    - name: Check if user exists
+      ansible.builtin.command: id {{ username_to_delete }}
+      register: user_check
+      changed_when: false  # This task never changes the system
+      failed_when: false  # Prevent task from failing if user doesn't exist
+
+    - name: Set fact for user existence
+      ansible.builtin.set_fact:
+        user_exists: "{{ user_check.rc == 0 }}"
+
+    - name: Display user existence status
+      ansible.builtin.debug:
+        msg: "'{{ username_to_delete }}' exists on {{ inventory_hostname }}"
+      when: user_exists
+
+    - name: Display user non-existence status
+      ansible.builtin.debug:
+        msg: "'{{ username_to_delete }}' does not exist on {{ inventory_hostname }}"
+      when: not user_exists
+
+    - name: Delete user if it exists
+      ansible.builtin.user:
+        name: "{{ username_to_delete }}"
+        state: absent
+        remove: yes  # This will remove the user's home directory and mail spool
+      when: user_exists
+      register: user_delete
+
+    - name: Display user deletion status
+      ansible.builtin.debug:
+        msg: "'{{ username_to_delete }}' has been deleted from {{ inventory_hostname }}"
+      when: user_delete.changed
+
+    - name: Confirm user no longer exists
+      ansible.builtin.command: id {{ username_to_delete }}
+      register: final_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display final status
+      ansible.builtin.debug:
+        msg: "Confirmed: '{{ username_to_delete }}' does not exist on {{ inventory_hostname }}"
+      when: final_check.rc != 0
+
+    - name: Collect user status for all hosts
+      ansible.builtin.set_fact:
+        all_hosts_status: "{{ all_hosts_status | default([]) + [{'host': inventory_hostname, 'user_existed': user_exists, 'user_deleted': user_delete.changed | default(false)}] }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Display summary of all hosts
+      ansible.builtin.debug:
+        msg: |
+          Summary of '{{ username_to_delete }}' status across all hosts:
+          {% for host in all_hosts_status %}
+          {{ host.host }}:
+            - User existed: {{ 'Yes' if host.user_existed else 'No' }}
+            - User deleted: {{ 'Yes' if host.user_deleted else 'N/A' }}
+          {% endfor %}
+      run_once: true
+      delegate_to: localhost

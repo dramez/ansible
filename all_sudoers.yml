@@ -1,0 +1,9 @@
+---
+- name: Copy from kvm-a00c source to all remote guests (linux)
+  hosts: centos debian ubuntu suse
+  tasks:
+    - name: Copy sudoers config file
+      copy:
+        src: /etc/sudoers.d/sshsvusr
+        dest: /etc/sudoers.d/sshsvusr
+        backup: no

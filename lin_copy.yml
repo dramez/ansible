@@ -1,0 +1,23 @@
+---
+- name: Copy from kvm-a00c source to all remote guests (linux)
+  hosts: centos debian ubuntu suse
+  tasks:
+    - name: Copy a new .ssh/authorized_keys file
+      copy:
+        src: /home/ansible/.ssh/authorized_keys
+        dest: /home/virtual/.ssh/authorized_keys
+        backup: yes
+
+- name: Copy from local folder to local folder (linux)
+  hosts: centos debian ubuntu suse
+  tasks:
+#    - name: Create /tmp/temp_local_linux.tmp file
+#      copy:
+#        content: '# This file is local temporary'
+#        dest: /tmp/temp_local_linux.tmp
+    - name: Copy /tmp/temp_local_linux.tmp file
+      copy:
+        src: /tmp/temp_local_linux.tmp
+        dest: /tmp/temp_local.tmp2
+        remote_src: yes
+        backup: yes

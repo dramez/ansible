@@ -1,0 +1,42 @@
+---
+- name: Gather Root Filesystem Information
+  hosts: redhat debian ubuntu
+  become: yes  # Run as sudo
+  gather_facts: yes  # Ensure we gather facts about the hosts
+
+  tasks:
+    - name: Get root filesystem usage
+      ansible.builtin.shell: df -h / | tail -n 1
+      register: df_output
+      changed_when: false  # This task never changes the system
+
+    - name: Parse df output
+      ansible.builtin.set_fact:
+        root_fs: "{{ df_output.stdout.split() }}"
+
+    - name: Display root filesystem information
+      ansible.builtin.debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          Filesystem: {{ root_fs[0] }}
+          Size: {{ root_fs[1] }}
+          Used: {{ root_fs[2] }} ({{ root_fs[4] }})
+          Available: {{ root_fs[3] }}
+          Mount: {{ root_fs[5] }}
+
+    - name: Check if filesystem usage is over 80%
+      ansible.builtin.debug:
+        msg: "WARNING: Root filesystem usage is over 80% on {{ inventory_hostname }}"
+      when: root_fs[4] | replace('%', '') | int > 80
+
+    - name: Collect all filesystem information
+      ansible.builtin.set_fact:
+        all_fs_info: "{{ all_fs_info | default([]) + [{'host': inventory_hostname, 'usage': root_fs[4], 'available': root_fs[3]}] }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Display summary of all hosts
+      ansible.builtin.debug:
+        msg: "{{ all_fs_info }}"
+      run_once: true
+      delegate_to: localhost

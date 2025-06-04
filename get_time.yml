@@ -1,0 +1,21 @@
+---
+- hosts: all
+  become: false
+  gather_facts: false
+
+  tasks:
+
+  - name: Gather date and time only
+    setup:
+      gather_subset:
+        - 'date_time'
+        - '!min'
+
+          #  - name: Show Gathered Facts
+          #    debug:
+          #      msg: "{{ hostvars }}"
+
+  - name: Show 'date_time' from specific Remote Node only
+    debug:
+      msg: "{{ hostvars['kvm-a00r'].ansible_facts.date_time }}"
+

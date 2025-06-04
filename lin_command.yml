@@ -1,0 +1,51 @@
+---
+- name: Execute Command on Remote Hosts
+  hosts: all
+  gather_facts: no
+
+  vars_prompt:
+    - name: "target_hosts"
+      prompt: "Enter target hosts or group (comma-separated for multiple hosts, or group name)"
+      private: no
+
+    - name: "user_command"
+      prompt: "Enter the command to run"
+      private: no
+
+  tasks:
+    - name: Set fact for target hosts
+      set_fact:
+        selected_hosts: "{{ target_hosts.split(',') | map('trim') | list }}"
+      when: "' ,' in target_hosts"
+
+    - name: Set fact for target group or single host
+      set_fact:
+        selected_hosts: "{{ groups[target_hosts] if target_hosts in groups else [target_hosts] }}"
+      when: "target_hosts in groups or target_hosts not in groups"
+
+    - name: Validate target hosts or group
+      fail:
+        msg: "Invalid target hosts or group. Please check your input and try again."
+      when: "selected_hosts is not defined or selected_hosts | length == 0"
+
+    - name: Run user-specified command
+      shell: "{{ user_command }}"
+      register: command_output
+      become: yes
+      when: "inventory_hostname in selected_hosts"
+
+    - name: Display command output
+      debug:
+        msg: |
+          ===== Output from {{ inventory_hostname }} =====
+          Command: {{ user_command }}
+          Output:
+          {{ command_output.stdout | default('No output') }}
+          Error:
+          {{ command_output.stderr | default('No error') }}
+      when: "inventory_hostname in selected_hosts"
+
+    - name: Display execution status
+      debug:
+        msg: "Command execution on {{ inventory_hostname }} completed with return code {{ command_output.rc }}"
+      when: "inventory_hostname in selected_hosts"

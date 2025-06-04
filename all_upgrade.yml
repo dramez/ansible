@@ -1,0 +1,87 @@
+---
+- hosts: redhat
+  tasks:
+
+  - name: Remove useless packages from the cache
+    ansible.builtin.command: yum clean all
+
+  - name: Gather current kernel version
+    shell: uname -r
+    register: current_kernel
+
+  - name: Update all packages to the latest version
+    yum:
+      name: '*'
+      state: latest
+
+  - name: Gather new kernel version
+    shell: uname -r
+    register: new_kernel
+    changed_when: false
+
+  - name: Check if kernel version has changed
+    set_fact:
+      kernel_changed: "{{ current_kernel.stdout != new_kernel.stdout }}"
+
+  - name: Reboot the server if the kernel has changed
+    reboot:
+    when: kernel_changed
+    ignore_errors: true
+
+  - name: Wait for the server to come back online
+    wait_for_connection:
+      timeout: 300
+    when: kernel_changed
+
+- hosts: debian ubuntu
+  vars:
+    reboot_required: false
+
+  tasks:
+  - name: Remove packages not needed anymore
+    ansible.builtin.apt:
+      autoremove: yes
+
+  - name: Remove useless packages from the cache
+    ansible.builtin.apt:
+      autoclean: yes
+
+  - name: Gather current kernel version
+    shell: uname -r
+    register: current_kernel
+
+  - name: Update all packages and kernel to the latest version
+    apt:
+      upgrade: dist
+      update_cache: yes
+        #      cache_valid_time: 3600
+        #    notify: "Check for kernel upgrade"
+
+  - name: Gather new kernel version
+    shell: uname -r
+    register: new_kernel
+    changed_when: false
+
+  - name: Check if kernel version has changed
+    set_fact:
+      kernel_changed: "{{ current_kernel.stdout != new_kernel.stdout }}"
+
+  - name: Reboot the server if the kernel has changed
+    reboot:
+    when: kernel_changed
+    ignore_errors: true
+
+  - name: Wait for the server to come back online
+    wait_for_connection:
+      timeout: 300
+    when: kernel_changed
+
+- hosts: windows
+  tasks:
+  - name: Install all updates
+    ansible.windows.win_updates:
+      category_names: '*'
+      reboot: yes
+      reboot_timeout: 3600
+
+

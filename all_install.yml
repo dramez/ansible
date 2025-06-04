@@ -1,0 +1,7 @@
+---
+- hosts: dnf
+  tasks:
+  - name: Install software
+    ansible.builtin.package:
+      name: yum-utils
+      state: latest

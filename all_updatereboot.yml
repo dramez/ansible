@@ -1,0 +1,87 @@
+---
+- name: Update Linux systems and reboot if required
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Update RedHat/CentOS/Rocky/Alma based systems
+      block:
+        - name: Update all packages on RedHat-based systems
+          yum:
+            name: "*"
+            state: latest
+          register: redhat_update_result
+          when: ansible_os_family == "RedHat"
+        
+        - name: Check if reboot is required (RedHat-based)
+          stat:
+            path: /var/run/reboot-required
+          register: redhat_reboot_required
+          when: ansible_os_family == "RedHat"
+        
+        - name: Check for kernel update (RedHat-based)
+          shell: |
+            if [ "$(rpm -q kernel --last | head -n1 | awk '{print $1}')" != "kernel-$(uname -r)" ]; then
+              echo "reboot_needed"
+            else
+              echo "no_reboot"
+            fi
+          register: redhat_kernel_check
+          changed_when: false
+          when: ansible_os_family == "RedHat"
+
+    - name: Update Debian/Ubuntu based systems
+      block:
+        - name: Update package cache on Debian-based systems
+          apt:
+            update_cache: yes
+            cache_valid_time: 3600
+          when: ansible_os_family == "Debian"
+        
+        - name: Upgrade all packages on Debian-based systems
+          apt:
+            upgrade: dist
+            autoremove: yes
+            autoclean: yes
+          register: debian_update_result
+          when: ansible_os_family == "Debian"
+        
+        - name: Check if reboot is required (Debian-based)
+          stat:
+            path: /var/run/reboot-required
+          register: debian_reboot_required
+          when: ansible_os_family == "Debian"
+
+    - name: Reboot RedHat-based systems if required
+      reboot:
+        msg: "Rebooting due to system updates"
+        reboot_timeout: 300
+        pre_reboot_delay: 10
+      when: 
+        - ansible_os_family == "RedHat"
+        - (redhat_reboot_required.stat.exists | default(false)) or 
+          (redhat_kernel_check.stdout | default('') == "reboot_needed")
+
+    - name: Reboot Debian-based systems if required
+      reboot:
+        msg: "Rebooting due to system updates"
+        reboot_timeout: 300
+        pre_reboot_delay: 10
+      when: 
+        - ansible_os_family == "Debian"
+        - debian_reboot_required.stat.exists | default(false)
+
+    - name: Wait for systems to come back online
+      wait_for_connection:
+        delay: 30
+        timeout: 300
+      when: ansible_connection != "local"
+
+    - name: Display update summary
+      debug:
+        msg: |
+          System: {{ inventory_hostname }}
+          OS Family: {{ ansible_os_family }}
+          Updates applied: {{ 'Yes' if (redhat_update_result.changed | default(false)) or (debian_update_result.changed | default(false)) else 'No' }}
+          Reboot performed: {{ 'Yes' if ansible_reboot_pending | default(false) else 'No' }}

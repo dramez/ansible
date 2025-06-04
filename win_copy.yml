@@ -1,0 +1,24 @@
+---
+- name: Copy from kvm-a00c source to all remote guests (windows)
+  hosts: windows
+  tasks:
+    - name: Copy /tmp/temp_remote.tmp file
+      ansible.windows.win_copy:
+        src: /tmp/temp_remote.tmp
+        dest: C:\Windows\Temp\temp_remote.tmp2
+        backup: yes
+
+- name: Copy from local folder to local folder (windows)
+  hosts: windows
+  tasks:
+    #    - name: Create temp file
+    #      ansible.windows.win_copy:
+    #        content: '# This file is local temporary'
+    #        dest: C:\Windows\Temp\temp_local.tmp
+
+    - name: Copy a "temp.tmp" file
+      ansible.windows.win_copy:
+        src: C:\Windows\Temp\temp_local.tmp
+        dest: C:\Windows\Temp\temp_local.tmp2
+        remote_src: yes
+        backup: yes

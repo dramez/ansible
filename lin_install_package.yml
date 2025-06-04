@@ -1,0 +1,48 @@
+---
+- name: Install KVM Guest Agent on Various Linux Distributions
+  hosts: redhat debian ubuntu
+  become: yes
+  vars:
+    packages:
+      - qemu-guest-agent
+
+  tasks:
+    - name: Update package cache and upgrade system (Debian/Ubuntu)
+      ansible.builtin.apt:
+        update_cache: yes
+        upgrade: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Update package cache and upgrade system (RedHat/CentOS/Rocky/Alma)
+      ansible.builtin.yum:
+        name: '*'
+        state: latest
+        update_cache: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Install QEMU Guest Agent (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: "{{ packages }}"
+        state: latest
+      when: ansible_os_family == "Debian"
+
+    - name: Install QEMU Guest Agent (RedHat/CentOS/Rocky/Alma)
+      ansible.builtin.yum:
+        name: "{{ packages }}"
+        state: latest
+      when: ansible_os_family == "RedHat"
+
+    - name: Enable and start QEMU Guest Agent service
+      ansible.builtin.service:
+        name: qemu-guest-agent
+        enabled: yes
+        state: started
+
+    - name: Verify QEMU Guest Agent service status
+      ansible.builtin.command: systemctl status qemu-guest-agent
+      register: service_status
+      ignore_errors: yes
+
+    - name: Print QEMU Guest Agent service status
+      ansible.builtin.debug:
+        var: service_status.stdout_lines

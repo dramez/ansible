@@ -1,0 +1,34 @@
+---
+- name: Add user
+  hosts: centos suse debian ubuntu templates
+  tasks: 
+    - user:
+        name: testuser
+          #        groups: wheel
+          #        shell: /bin/bash
+        state: present
+
+          #- name: Add user on DEB system
+          #  hosts: debian ubuntu
+          #  tasks:
+          #    - user:
+          #        name: manageviassh
+          #        groups: sudo
+          #        shell: /bin/bash
+          #        state: absent
+
+          #- name: Delete content & directory
+          #  hosts: centos suse debian ubuntu
+          #  tasks:
+          #    - file:
+          #        state: absent
+          #        path: /home/sshsvusr/
+
+
+#- name: Update clients using zypper
+#  hosts: other
+#  tasks:
+#    - name: Update packages
+#      community.general.zypper:
+#        name: '*'
+#        state: latest

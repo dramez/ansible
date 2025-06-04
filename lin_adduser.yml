@@ -1,0 +1,75 @@
+---
+- name: Add New User to Linux OS with Password
+  hosts: linux
+  become: yes  # Run as sudo
+  gather_facts: yes  # Ensure we gather facts about the hosts
+
+  vars_prompt:
+    - name: "new_username"
+      prompt: "Enter the username to create"
+      private: no  # Show the input as it's typed
+
+    - name: "password1"
+      prompt: "Enter the password for the new user"
+      private: yes  # Hide the input
+
+    - name: "password2"
+      prompt: "Confirm the password"
+      private: yes  # Hide the input
+
+  tasks:
+    - name: Validate username
+      ansible.builtin.assert:
+        that:
+          - new_username | regex_search('^[a-z_][a-z0-9_-]*[$]?$')
+        fail_msg: "Invalid username. Username must start with a lowercase letter or underscore, and can only contain lowercase letters, digits, underscores, and hyphens."
+
+    - name: Verify passwords match
+      ansible.builtin.assert:
+        that:
+          - password1 == password2
+        fail_msg: "Passwords do not match. Please run the playbook again."
+
+    - name: Check if user already exists
+      ansible.builtin.command: id -u {{ new_username }}
+      register: user_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create new user
+      ansible.builtin.user:
+        name: "{{ new_username }}"
+        password: "{{ password1 | password_hash('sha512', 65534 | random(seed=inventory_hostname) | string) }}"
+        state: present
+        create_home: yes
+        shell: /bin/bash
+      when: user_check.rc != 0
+      register: user_create
+
+    - name: Display user creation status
+      ansible.builtin.debug:
+        msg: "User '{{ new_username }}' has been created on {{ inventory_hostname }} with the provided password."
+      when: user_create.changed
+
+    - name: Display user already exists message
+      ansible.builtin.debug:
+        msg: "User '{{ new_username }}' already exists on {{ inventory_hostname }}. No changes were made."
+      when: user_check.rc == 0
+
+    - name: Collect user creation status for all hosts
+      ansible.builtin.set_fact:
+        all_hosts_status: "{{ all_hosts_status | default([]) + [{'host': inventory_hostname, 'user_created': user_create.changed | default(false), 'user_existed': user_check.rc == 0}] }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Display summary of all hosts
+      ansible.builtin.debug:
+        msg: |
+          Summary of user creation status across all hosts:
+          {% for host in all_hosts_status %}
+          {{ host.host }}:
+            - User created: {{ 'Yes' if host.user_created else 'No' }}
+            - User already existed: {{ 'Yes' if host.user_existed else 'No' }}
+          {% endfor %}
+      run_once: true
+      delegate_to: localhost

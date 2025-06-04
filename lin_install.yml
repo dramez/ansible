@@ -1,0 +1,13 @@
+---
+- hosts: centos debian ubuntu suse templates
+  tasks:
+  - name: Install software
+    ansible.builtin.package:
+      name:
+        - sshpass
+      state: latest
+    #    - name: enable services on boot
+    #      ansible.builtin.service:
+    #        name: tuned
+    #        enabled: true
+    #        state: started
