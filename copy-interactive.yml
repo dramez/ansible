@@ -1,0 +1,93 @@
+---
+- name: Interactive file copy playbook
+  hosts: "{{ target_hosts | default('all') }}"
+  vars_prompt:
+    - name: copy_type
+      prompt: "Copy type - (1) Local to Remote, (2) Remote to Remote, (3) Local to Local"
+      private: no
+      default: "1"
+    
+    - name: source_path
+      prompt: "Enter source file/directory path"
+      private: no
+    
+    - name: dest_path
+      prompt: "Enter destination file/directory path"
+      private: no
+    
+    - name: target_hosts
+      prompt: "Enter target hosts (comma-separated) or 'all' for all hosts"
+      private: no
+      default: "all"
+    
+    - name: backup_files
+      prompt: "Create backup of existing files? (yes/no)"
+      private: no
+      default: "yes"
+    
+    - name: create_dirs
+      prompt: "Create destination directories if they don't exist? (yes/no)"
+      private: no
+      default: "yes"
+
+  tasks:
+    - name: Display copy operation details
+      debug:
+        msg: |
+          Copy Operation Summary:
+          - Type: {{ copy_type }}
+          - Source: {{ source_path }}
+          - Destination: {{ dest_path }}
+          - Target hosts: {{ target_hosts }}
+          - Backup: {{ backup_files }}
+
+    - name: Copy files - Local to Remote (Type 1)
+      copy:
+        src: "{{ source_path }}"
+        dest: "{{ dest_path }}"
+        backup: "{{ backup_files | bool }}"
+        force: yes
+      when: copy_type == "1"
+
+    - name: Copy files - Remote to Remote (Type 2)
+      copy:
+        src: "{{ source_path }}"
+        dest: "{{ dest_path }}"
+        remote_src: yes
+        backup: "{{ backup_files | bool }}"
+        force: yes
+      when: copy_type == "2"
+
+    - name: Copy files - Local to Local on remote hosts (Type 3)
+      copy:
+        src: "{{ source_path }}"
+        dest: "{{ dest_path }}"
+        remote_src: yes
+        backup: "{{ backup_files | bool }}"
+        force: yes
+      when: copy_type == "3"
+
+    - name: Create destination directories if needed
+      file:
+        path: "{{ dest_path | dirname }}"
+        state: directory
+        mode: '0755'
+      when: 
+        - create_dirs | bool
+        - dest_path is match('.*/')
+      ignore_errors: yes
+
+    - name: Verify copy operation
+      stat:
+        path: "{{ dest_path }}"
+      register: copy_result
+
+    - name: Display copy result
+      debug:
+        msg: |
+          Copy operation completed!
+          File exists at destination: {{ copy_result.stat.exists }}
+          {% if copy_result.stat.exists %}
+          File size: {{ copy_result.stat.size }} bytes
+          Last modified: {{ copy_result.stat.mtime }}
+          {% endif %}
