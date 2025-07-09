@@ -1,44 +1,42 @@
 ---
-- name: System Resource Information
+- name: System Resource Information (Using Ansible Facts)
   hosts: all
   gather_facts: yes
   tasks:
-    - name: Get disk usage for all mounted partitions
-      shell: df -h | grep -vE '^Filesystem|tmpfs|cdrom'
-      register: disk_usage
-      changed_when: false
+    - name: Get mounted filesystem information
+      setup:
+        filter: ansible_mounts
 
-    - name: Get memory usage
-      shell: free -h
-      register: memory_usage
-      changed_when: false
-
-    - name: Get CPU load average
-      shell: uptime
-      register: cpu_load
-      changed_when: false
-
-    - name: Get detailed CPU usage
-      shell: top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}'
-      register: cpu_usage_percent
-      changed_when: false
-
-    - name: Display system resource information
+    - name: Display disk usage information
       debug:
         msg: |
-          ========================================
-          HOST: {{ inventory_hostname }}
-          ========================================
-          
-          DISK USAGE:
-          {{ disk_usage.stdout }}
-          
-          MEMORY USAGE:
-          {{ memory_usage.stdout }}
-          
-          CPU LOAD AVERAGE:
-          {{ cpu_load.stdout }}
-          
-          CPU USAGE:
-          {{ cpu_usage_percent.stdout }}
-          ========================================
+          Partition: {{ item.mount }}
+          Device: {{ item.device }}
+          Filesystem: {{ item.fstype }}
+          Size: {{ (item.size_total / 1024 / 1024 / 1024) | round(2) }} GB
+          Used: {{ ((item.size_total - item.size_available) / 1024 / 1024 / 1024) | round(2) }} GB
+          Available: {{ (item.size_available / 1024 / 1024 / 1024) | round(2) }} GB
+          Usage: {{ (((item.size_total - item.size_available) / item.size_total) * 100) | round(1) }}%
+          ---
+      loop: "{{ ansible_mounts }}"
+      when: item.size_total is defined
+
+    - name: Display memory information
+      debug:
+        msg: |
+          Total Memory: {{ (ansible_memtotal_mb / 1024) | round(2) }} GB
+          Free Memory: {{ (ansible_memfree_mb / 1024) | round(2) }} GB
+          Used Memory: {{ ((ansible_memtotal_mb - ansible_memfree_mb) / 1024) | round(2) }} GB
+          Memory Usage: {{ (((ansible_memtotal_mb - ansible_memfree_mb) / ansible_memtotal_mb) * 100) | round(1) }}%
+
+    - name: Get current CPU load
+      shell: cat /proc/loadavg
+      register: load_avg
+      changed_when: false
+
+    - name: Display CPU load information
+      debug:
+        msg: |
+          CPU Load Average: {{ load_avg.stdout }}
+          CPU Cores: {{ ansible_processor_vcpus }}
+          Load per core: {{ (load_avg.stdout.split()[0] | float / ansible_processor_vcpus) | round(2) }}
