@@ -1,0 +1,44 @@
+---
+- name: System Resource Information
+  hosts: all
+  gather_facts: yes
+  tasks:
+    - name: Get disk usage for all mounted partitions
+      shell: df -h | grep -vE '^Filesystem|tmpfs|cdrom'
+      register: disk_usage
+      changed_when: false
+
+    - name: Get memory usage
+      shell: free -h
+      register: memory_usage
+      changed_when: false
+
+    - name: Get CPU load average
+      shell: uptime
+      register: cpu_load
+      changed_when: false
+
+    - name: Get detailed CPU usage
+      shell: top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}'
+      register: cpu_usage_percent
+      changed_when: false
+
+    - name: Display system resource information
+      debug:
+        msg: |
+          ========================================
+          HOST: {{ inventory_hostname }}
+          ========================================
+          
+          DISK USAGE:
+          {{ disk_usage.stdout }}
+          
+          MEMORY USAGE:
+          {{ memory_usage.stdout }}
+          
+          CPU LOAD AVERAGE:
+          {{ cpu_load.stdout }}
+          
+          CPU USAGE:
+          {{ cpu_usage_percent.stdout }}
+          ========================================
